@@ -10,3 +10,4 @@ token.json
 credentials.json
 main.py
 __pycache__
+.env
