@@ -21,7 +21,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from langchain_google_community.calendar.utils import build_resource_service
 from datetime import datetime
 from langgraph.checkpoint.memory import MemorySaver
+from dotenv import load_dotenv
 
+
+load_dotenv()
 # Global variables
 app_state = {}
 
@@ -77,7 +80,7 @@ async def lifespan(app: FastAPI):
     if "GOOGLE_API_KEY" not in os.environ:
         # For production, you should set this as an environment variable
         print("Warning: GOOGLE_API_KEY not found in environment variables")
-        os.environ["GOOGLE_API_KEY"] = "AIzaSyCB_HGBDlb286X2BNog0caxMXeo0aSvCbo" 
+        os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY 
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
     tools = getCalenderTools()
