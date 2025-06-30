@@ -28,6 +28,13 @@ load_dotenv()
 # Global variables
 app_state = {}
 
+def get_current_datetime():
+    now = datetime.now();
+    return{
+        "current_date":now.strftime("%A, %B %d, %Y"),
+        "current_time":now.strftime("%I:%M %p")
+    }
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -35,10 +42,11 @@ async def lifespan(app: FastAPI):
     
     # Initialize your existing code
     memory = MemorySaver()
-    current_date = datetime.now().strftime("%A, %B %d, %Y")
-    current_time = datetime.now().strftime("%I:%M %p")
+    # current_date = datetime.now().strftime("%A, %B %d, %Y")
+    # current_time = datetime.now().strftime("%I:%M %p")
+    current_dt = get_current_datetime()
 
-    SYSTEM_PROMPT = f"""You are a helpful calendar assistant. Today's date is {current_date} and the current time is {current_time}. 
+    SYSTEM_PROMPT = f"""You are a helpful calendar assistant. Today's date is {current_dt['current_date']} and the current time is {current_dt['current_time']}. 
 
     When users ask about scheduling events, meetings, or calendar-related tasks, always consider this current date and time context. You can help users:
 
@@ -47,6 +55,7 @@ async def lifespan(app: FastAPI):
     - Check their calendar for availability
     - Update or modify existing events
     - Answer questions about their schedule
+    - Delete events if requested
 
     Always be precise with dates and times, and ask for clarification if the user's request is ambiguous about timing."""
 
@@ -88,6 +97,7 @@ async def lifespan(app: FastAPI):
 
     def chatbot(state: State):
         messages = state["messages"]
+
         has_system_message = any(msg.get("role") == "system" for msg in messages if hasattr(msg, 'get') or isinstance(msg, dict))
         
         if not has_system_message:
@@ -114,10 +124,11 @@ async def lifespan(app: FastAPI):
     
     # Store in global state
     app_state["graph"] = graph
-    app_state["current_date"] = current_date
-    app_state["current_time"] = current_time
+    # app_state["current_date"] = current_date
+    # app_state["current_time"] = current_time
     
-    print(f"Calendar Assistant initialized. Today is {current_date}")
+    current_dt = get_current_datetime()
+    print(f"Calendar Assistant initialized. Today is {current_dt['current_date']}")
     
     yield
     
@@ -129,7 +140,7 @@ app = FastAPI(title="Calendar Assistant API", lifespan=lifespan)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_origins=["https://calendar-agent-tailortalk.streamlit.app"],  # In production, specify your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -146,10 +157,11 @@ class ChatResponse(BaseModel):
 
 @app.get("/")
 async def root():
+    current_dt = get_current_datetime()
     return {
         "message": "Calendar Assistant API", 
-        "current_date": app_state.get("current_date", "Not initialized"),
-        "current_time": app_state.get("current_time", "Not initialized")
+        "current_date": current_dt["current_date"],
+        "current_time": current_dt["current_time"]
     }
 
 @app.post("/chat", response_model=ChatResponse)
@@ -189,6 +201,15 @@ async def chat(message: ChatMessage):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "initialized": "graph" in app_state}
+
+@app.get("/current-time")
+async def get_current_time():
+    current_dt = get_current_datetime()
+    return{
+        "current date":current_dt["current_date"],
+        "current time":current_dt["current_time"],
+        "timestamp":datetime.now().isoformat()
+    }
 
 if __name__ == "__main__":
     import uvicorn
