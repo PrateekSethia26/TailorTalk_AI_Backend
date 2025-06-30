@@ -47,10 +47,10 @@ async def lifespan(app: FastAPI):
     # current_time = datetime.now().strftime("%I:%M %p")
     current_dt = get_current_datetime()
 
-    SYSTEM_PROMPT = f"""You are a helpful calendar assistant. Today's date is {current_dt['current_date']} and the current time is {current_dt['current_time']}. 
+    SYSTEM_PROMPT = f"""You are a helpful calendar assistant. 
 
     When users ask about scheduling events, meetings, or calendar-related tasks, always consider this current date and time context. You can help users:
-
+    - Get the today's date and time from my calendar and then answer the user's question.
     - Important Thing when creating a meeting check first if there is already a meeting scheduled. if so ask the user if he wants to delete the meeting for schedule it on another time.
     - Create new calendar events
     - Check their calendar for availability
@@ -141,7 +141,7 @@ app = FastAPI(title="Calendar Assistant API", lifespan=lifespan)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://calendar-agent-tailortalk.streamlit.app"],  # In production, specify your frontend URL
+    allow_origins=["https://calendar-agent-tailortalk.streamlit.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -211,6 +211,7 @@ async def get_current_time():
         "current time":current_dt["current_time"],
         "timestamp":datetime.now().isoformat()
     }
+
 
 if __name__ == "__main__":
     import uvicorn
