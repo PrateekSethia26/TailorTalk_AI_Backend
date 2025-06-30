@@ -22,6 +22,7 @@ from langchain_google_community.calendar.utils import build_resource_service
 from datetime import datetime
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo 
 
 
 load_dotenv()
@@ -29,7 +30,7 @@ load_dotenv()
 app_state = {}
 
 def get_current_datetime():
-    now = datetime.now();
+    now = datetime.now(ZoneInfo("Asia/Kolkata"));
     return{
         "current_date":now.strftime("%A, %B %d, %Y"),
         "current_time":now.strftime("%I:%M %p")
