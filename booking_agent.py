@@ -39,7 +39,8 @@ async def lifespan(app: FastAPI):
     SYSTEM_PROMPT = f"""You are a helpful calendar assistant. 
 
     When users ask about scheduling events, meetings, or calendar-related tasks, always consider this current date and time context. You can help users:
-    - Get the today's date and time from my calendar and then answer the user's question.
+    - Always convert the date and time from UTC timezone to IST timezone first
+    - Get present date and time first and then schedule an event
     - Important Thing when creating a meeting check first if there is already a meeting scheduled. if so ask the user if he wants to delete the meeting for schedule it on another time.
     - Create new calendar events
     - Check their calendar for availability
@@ -51,7 +52,6 @@ async def lifespan(app: FastAPI):
 
     class State(TypedDict):
         messages: Annotated[list, add_messages]
-        current_datetime: dict
 
     SCOPES = ["https://www.googleapis.com/auth/calendar"]
     
@@ -74,7 +74,9 @@ async def lifespan(app: FastAPI):
         credentials = getAccessToken()
         api_resource = build_resource_service(credentials=credentials)
         toolkit = CalendarToolkit(api_resource=api_resource)
-        return toolkit.get_tools()
+        all_tools = toolkit.get_tools()
+
+        return all_tools
 
     # Set up Google AI API key
     if "GOOGLE_API_KEY" not in os.environ:
@@ -88,11 +90,6 @@ async def lifespan(app: FastAPI):
 
     def chatbot(state: State):
         messages = state["messages"]
-
-        current_dt = state.get("current_datetime")
-        if not current_dt :
-            raise ValueError("Error in fetching current datetime through frontend")
-
         has_system_message = any(msg.get("role") == "system" for msg in messages if hasattr(msg, 'get') or isinstance(msg, dict))
         
         if not has_system_message:
@@ -140,8 +137,6 @@ app.add_middleware(
 class ChatMessage(BaseModel):
     message: str
     thread_id: str = "1"
-    current_date : str
-    current_time : str
 
 class ChatResponse(BaseModel):
     response: str
@@ -161,16 +156,10 @@ async def chat(message: ChatMessage):
         
         graph = app_state["graph"]
         config = {"configurable": {"thread_id": message.thread_id}}
-
-        current_datetime = {
-            "current_date" : message.current_date,
-            "current_time" : message.current_time
-        }
         
         # Stream the graph updates
         events = graph.stream(
-            {"messages": [{"role": "user", "content": message.message}],
-             "current_datetime": current_datetime
+            {"messages": [{"role": "user", "content": message.message}]
             },
             config,
             stream_mode="values",
