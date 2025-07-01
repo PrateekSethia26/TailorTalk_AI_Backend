@@ -22,19 +22,11 @@ from langchain_google_community.calendar.utils import build_resource_service
 from datetime import datetime
 from langgraph.checkpoint.memory import MemorySaver
 from dotenv import load_dotenv
-from zoneinfo import ZoneInfo 
 
 
 load_dotenv()
 # Global variables
 app_state = {}
-
-def get_current_datetime():
-    now = datetime.now(ZoneInfo("Asia/Kolkata"));
-    return{
-        "current_date":now.strftime("%A, %B %d, %Y"),
-        "current_time":now.strftime("%I:%M %p")
-    }
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,9 +35,6 @@ async def lifespan(app: FastAPI):
     
     # Initialize your existing code
     memory = MemorySaver()
-    # current_date = datetime.now().strftime("%A, %B %d, %Y")
-    # current_time = datetime.now().strftime("%I:%M %p")
-    current_dt = get_current_datetime()
 
     SYSTEM_PROMPT = f"""You are a helpful calendar assistant. 
 
@@ -62,6 +51,7 @@ async def lifespan(app: FastAPI):
 
     class State(TypedDict):
         messages: Annotated[list, add_messages]
+        current_datetime: dict
 
     SCOPES = ["https://www.googleapis.com/auth/calendar"]
     
@@ -99,6 +89,10 @@ async def lifespan(app: FastAPI):
     def chatbot(state: State):
         messages = state["messages"]
 
+        current_dt = state.get("current_datetime")
+        if not current_dt :
+            raise ValueError("Error in fetching current datetime through frontend")
+
         has_system_message = any(msg.get("role") == "system" for msg in messages if hasattr(msg, 'get') or isinstance(msg, dict))
         
         if not has_system_message:
@@ -125,11 +119,6 @@ async def lifespan(app: FastAPI):
     
     # Store in global state
     app_state["graph"] = graph
-    # app_state["current_date"] = current_date
-    # app_state["current_time"] = current_time
-    
-    current_dt = get_current_datetime()
-    print(f"Calendar Assistant initialized. Today is {current_dt['current_date']}")
     
     yield
     
@@ -151,6 +140,8 @@ app.add_middleware(
 class ChatMessage(BaseModel):
     message: str
     thread_id: str = "1"
+    current_date : str
+    current_time : str
 
 class ChatResponse(BaseModel):
     response: str
@@ -158,11 +149,8 @@ class ChatResponse(BaseModel):
 
 @app.get("/")
 async def root():
-    current_dt = get_current_datetime()
     return {
         "message": "Calendar Assistant API", 
-        "current_date": current_dt["current_date"],
-        "current_time": current_dt["current_time"]
     }
 
 @app.post("/chat", response_model=ChatResponse)
@@ -173,10 +161,17 @@ async def chat(message: ChatMessage):
         
         graph = app_state["graph"]
         config = {"configurable": {"thread_id": message.thread_id}}
+
+        current_datetime = {
+            "current_date" : message.current_date,
+            "current_time" : message.current_time
+        }
         
         # Stream the graph updates
         events = graph.stream(
-            {"messages": [{"role": "user", "content": message.message}]},
+            {"messages": [{"role": "user", "content": message.message}],
+             "current_datetime": current_datetime
+            },
             config,
             stream_mode="values",
         )
@@ -203,14 +198,6 @@ async def chat(message: ChatMessage):
 async def health_check():
     return {"status": "healthy", "initialized": "graph" in app_state}
 
-@app.get("/current-time")
-async def get_current_time():
-    current_dt = get_current_datetime()
-    return{
-        "current date":current_dt["current_date"],
-        "current time":current_dt["current_time"],
-        "timestamp":datetime.now().isoformat()
-    }
 
 
 if __name__ == "__main__":
